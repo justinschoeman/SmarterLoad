@@ -42,23 +42,30 @@ void sunsynk_setup()
   node.postTransmission(postTransmission);
 }
 
-void sunsynk_read()
+int8_t sunsynk_read()
 {
   uint8_t result;
-  uint16_t val;
+  int16_t val;
   int i;
 
-  //node.begin(i, Serial);
+  // flush serial before enabling 485 transceiver!
   Serial.flush();
-  result = node.readHoldingRegisters(173, 13);
+  result = node.readHoldingRegisters(175, 10);
   if(result == node.ku8MBSuccess) {
+    /*
     for(i = 0; i < 13; i++) {
       val = node.getResponseBuffer(i);
       Serial.print(173+i);
       Serial.print(" ");
       Serial.println(val);
     }
+    */
+    sun_inv_power = node.getResponseBuffer(0);
+    sun_load_power = node.getResponseBuffer(3);
+    sun_soc = node.getResponseBuffer(9);
   } else {
     Serial.println("read failed!");
+    return 0;
   }
+  return 1;
 }

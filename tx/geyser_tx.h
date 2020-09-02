@@ -46,12 +46,24 @@ void tx_setup()
 
 int sendHard(const char * data) {
   unsigned long ts = millis();
+  int8_t ret;
+  Serial.print("Sending: ");
+  Serial.println(data);
+  wdt_reset();
   while(1) {
-    if(_radio.send(DESTINATION_RADIO_ID, (void *)data, strlen(data))) return 1;
-    if((millis() - ts) > (10000UL*5)) {
-      return 0;
+    if(_radio.send(DESTINATION_RADIO_ID, (void *)data, strlen(data))) {
+      ret = 1;
+      break;
+    }
+    if((millis() - ts) > 6000UL) {
+      ret = 0;
+      break;
     }
   }
+  wdt_reset();
+  Serial.print("Send result: ");
+  Serial.println(ret);
+  return ret;
 }
 
 char sbuf[32];
