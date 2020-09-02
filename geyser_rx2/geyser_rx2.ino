@@ -1,4 +1,18 @@
 /*
+ *  This is a very basic receiver module.  It is designed to replace the timer board in a common 
+ *  off the shelf geyser timer.
+ *  
+ *  I used a Hellerman Tyton unit.  It has a base board with 3.3v PSU + 30A relay.  The PSU is only
+ *  good for around 100uA continuous, so low current is critical.
+ *  
+ *  Hardware is basically a NRF24L01 module hooked up as per the library description.
+ *  
+ *  Software turns off radio and powers down CPU for 4s, then wakes up, puts radio in receive mode,
+ *  and waits another 15ms for any packets to be received.
+ *  
+ *  So the transmitter must send continuously for 6s to be sure the receiver gets it.
+ */
+/*
 CE    -> 9
 CSN   -> 10 (Hardware SPI SS)
 MOSI  -> 11 (Hardware SPI MOSI)

@@ -24,19 +24,10 @@ const static uint8_t DESTINATION_RADIO_ID = 'R'; // Id of the radio we will tran
 const static uint8_t PIN_RADIO_CE = 9;
 const static uint8_t PIN_RADIO_CSN = 10;
 
-struct RadioPacket // Any packet up to 32 bytes can be sent.
-{
-    uint8_t FromRadioId;
-    uint32_t OnTimeMillis;
-    uint32_t FailedTxCount;
-};
-
 NRFLite _radio;
 
-void setup()
+void tx_setup()
 {
-    Serial.begin(9600);
-    
     // By default, 'init' configures the radio to use a 2MBPS bitrate on channel 100 (channels 0-125 are valid).
     // Both the RX and TX radios must have the same bitrate and channel to communicate with each other.
     // You can run the 'ChannelScanner' example to help select the best channel for your environment.
@@ -80,7 +71,7 @@ void docmd (void) {
     }
 }
 
-void loop()
+void tx()
 {
     while(Serial.available()) {
       if(cpos >= 32) {

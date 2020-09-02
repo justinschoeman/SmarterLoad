@@ -1,3 +1,4 @@
+//https://github.com/4-20ma/ModbusMaster.git
 #include <ModbusMaster.h>
 
 // transmit enable (active high)
@@ -9,6 +10,7 @@
 
 ModbusMaster node;
 
+// rs485 transceiver mode control
 void preTransmission()
 {
   digitalWrite(INV_NRE, 1);
@@ -21,12 +23,9 @@ void postTransmission()
   digitalWrite(INV_DE, 0);
 }
 
-void setup()
+// setup
+void sunsynk_setup()
 {
-  pinMode(8, OUTPUT);
-  digitalWrite(8, 1);
-  delay(500UL);
-  digitalWrite(8,0);
 
   pinMode(INV_NRE, OUTPUT);
   pinMode(INV_DE, OUTPUT);
@@ -43,34 +42,23 @@ void setup()
   node.postTransmission(postTransmission);
 }
 
-void loop()
+void sunsynk_read()
 {
   uint8_t result;
-  uint16_t r;
+  uint16_t val;
   int i;
 
-  Serial.println("STARTING!");
-  for(i = 0; i < 1024; i++) {
-    //node.begin(i, Serial);
-    Serial.flush();
-    result = node.readHoldingRegisters(i, 1);
-    Serial.println("");
-    Serial.print(i);
-    Serial.print(": ");
-    if (result == node.ku8MBSuccess)
-    {
-      r = node.getResponseBuffer(0x00);
-      Serial.print(r, HEX);
+  //node.begin(i, Serial);
+  Serial.flush();
+  result = node.readHoldingRegisters(173, 13);
+  if(result == node.ku8MBSuccess) {
+    for(i = 0; i < 13; i++) {
+      val = node.getResponseBuffer(i);
+      Serial.print(173+i);
       Serial.print(" ");
-      Serial.print(r >> 8);
-      Serial.print(" ");
-      Serial.print(r & 0xff);
-      Serial.print(" ");
-      Serial.print(r);
-      Serial.println(" ");
-    } else {
-      Serial.println("read failed!");
+      Serial.println(val);
     }
+  } else {
+    Serial.println("read failed!");
   }
-  delay(1000);
 }
