@@ -22,7 +22,7 @@ unsigned long sys_ts;
 
 void do_state(void) {
   // process sys state
-  if(sun_load_power > POWER_MAX) {
+  if(sun_load_power > POWER_MAX || sun_inv_power > POWER_MAX) {
     // exceed limit
     Serial.println("POWER TOO HIGH - SHUT OFF LOAD");
     tx_set_state(0); // set shutoff state
