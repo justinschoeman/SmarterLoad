@@ -67,8 +67,6 @@ int8_t tx_send_hard(const char * data) {
   
   Serial.print("Sending: ");
   Serial.println(data);
-  // long process - reset watchdog before we try
-  wdt_reset();
   // tight loop - must get as many transmissions as possible in in 15ms window receiver is awake...
   while((millis() - ts) <= TX_SEND_MS) {
     if(radio.send(RADIO_DST_ID, (void *)data, strlen(data))) {
@@ -76,8 +74,6 @@ int8_t tx_send_hard(const char * data) {
       break;
     }
   }
-  // long process - reset watchdog when done
-  wdt_reset();
   Serial.print("Send result: ");
   Serial.println(ret);
   return ret;
@@ -104,6 +100,8 @@ void tx_run(void) {
   } else {
     i = tx_send_hard("POWEROFF");
   }
+  // record timestamp
+  tx_ts = millis(); 
   // we are just sending for security - ignore result
   if(tx_acks >= TX_MIN_ACK) return;
   // sending to change state? track/check results
