@@ -32,10 +32,13 @@ NRFLite radio;
 #define TX_MIN_ACK 5
 // send time (make ~50% longer than the receiver poll interval
 #define TX_SEND_MS 6000UL
+// poll interval (once command is acked, resend every this interval...)
+#define TX_POLL_MS 60000UL
 
 uint8_t tx_state; // 0 = off, 1 = on
 uint8_t tx_acks;
 uint8_t tx_nacks;
+unsigned long tx_ts;
 
 // set up new tx state
 void tx_set_state(uint8_t newstate) {
@@ -43,25 +46,25 @@ void tx_set_state(uint8_t newstate) {
   tx_state = newstate;
   tx_acks = 0;
   tx_nacks = 0;
+  tx_ts = millis();
 }
 
 void tx_setup()
 {
-    if(!radio.init(RADIO_ID, RADIO_CE, RADIO_CSN)) {
-        Serial.println("Cannot communicate with radio");
-        while (1); // Wait here until watchdog reboots us
-    }
-    Serial.println("radio init");
-    // receiver defaults to on, so we do too
-    tx_state = 1;
-    // pretend we are in ack phase
-    tx_acks = TX_MIN_ACK + 1;
-    tx_nacks = 0;
+  if(!radio.init(RADIO_ID, RADIO_CE, RADIO_CSN)) {
+    Serial.println("Cannot communicate with radio");
+    while (1) {} // Wait here until watchdog reboots us
+  }
+  Serial.println("radio init");
+  // receiver defaults to on, so we do too
+  tx_state = 255; // ensure bad state
+  tx_set_state(1); // set up whole state
 }
 
-int tx_send_hard(const char * data) {
+int8_t tx_send_hard(const char * data) {
   unsigned long ts = millis();
   int8_t ret = 0;
+  
   Serial.print("Sending: ");
   Serial.println(data);
   // long process - reset watchdog before we try
@@ -80,33 +83,38 @@ int tx_send_hard(const char * data) {
   return ret;
 }
 
-char sbuf[32];
-int cpos = 0;
-
-void docmd (void) {
-    Serial.print("Sending: '");
-    Serial.print(sbuf);
-    Serial.print("':");
-    if(tx_send_hard(sbuf)) {
-        Serial.println("...Success");
-    } else {
-        Serial.println("...Failed");
+// perform any necessary tx actions
+void tx_run(void) {
+  int8_t i;
+  
+  if(tx_acks >= TX_MIN_ACK) {
+    // we have already received the minimum number of acks - only send every X seconds
+    if((millis() - tx_ts) < TX_POLL_MS) return;
+    // we are due to send now...
+  }
+  // debug
+  Serial.print("state: ");
+  Serial.println(tx_state);
+  Serial.print("acks: ");
+  Serial.println(tx_acks);
+  Serial.print("nacks: ");
+  Serial.println(tx_nacks);
+  if(tx_state) {
+    i = tx_send_hard("POWERON");
+  } else {
+    i = tx_send_hard("POWEROFF");
+  }
+  // we are just sending for security - ignore result
+  if(tx_acks >= TX_MIN_ACK) return;
+  // sending to change state? track/check results
+  if(i) {
+    tx_acks++;
+  } else {
+    tx_nacks++;
+    if(tx_nacks + tx_acks > 2*TX_MIN_ACK) {
+      // too many nacks - force reboot
+      Serial.println("Too many nacks... Forcing reboot.");
+      while(1) {}
     }
-}
-
-void tx() {
-    while(Serial.available()) {
-      if(cpos >= 32) {
-        Serial.println("overflow");
-        cpos = 0;
-      }
-      sbuf[cpos] = Serial.read();
-      if(sbuf[cpos] == '\n') {
-        sbuf[cpos] = 0;
-        cpos = 0;
-        docmd();
-        continue;
-      }
-      cpos++;
-    }
+  }
 }

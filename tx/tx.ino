@@ -57,9 +57,9 @@ void loop()
   Serial.println(sun_soc);
 
   if(sun_load_power > 0) {
-    tx_send_hard("POWEROFF");
+    tx_set_state(0);
   } else {
-    tx_send_hard("POWERON");
+    tx_set_state(1);
     
   }
   delay(1000);
