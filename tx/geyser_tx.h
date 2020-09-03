@@ -19,47 +19,61 @@ GND   -> GND
 #include <SPI.h>
 #include <NRFLite.h>
 
-const static uint8_t RADIO_ID = 'T';             // Our radio's id.
-const static uint8_t DESTINATION_RADIO_ID = 'R'; // Id of the radio we will transmit to.
-const static uint8_t PIN_RADIO_CE = 9;
-const static uint8_t PIN_RADIO_CSN = 10;
+// our ID
+#define RADIO_ID 'T'
+// receiver ID
+#define RADIO_DST_ID 'R'
+#define RADIO_CE 9
+#define RADIO_CSN 10
 
-NRFLite _radio;
+NRFLite radio;
+
+// min acks before we consider state received
+#define TX_MIN_ACK 5
+// send time (make ~50% longer than the receiver poll interval
+#define TX_SEND_MS 6000UL
+
+uint8_t tx_state; // 0 = off, 1 = on
+uint8_t tx_acks;
+uint8_t tx_nacks;
+
+// set up new tx state
+void tx_set_state(uint8_t newstate) {
+  if(newstate == tx_state) return;
+  tx_state = newstate;
+  tx_acks = 0;
+  tx_nacks = 0;
+}
 
 void tx_setup()
 {
-    // By default, 'init' configures the radio to use a 2MBPS bitrate on channel 100 (channels 0-125 are valid).
-    // Both the RX and TX radios must have the same bitrate and channel to communicate with each other.
-    // You can run the 'ChannelScanner' example to help select the best channel for your environment.
-    // You can assign a different bitrate and channel as shown below.
-    //   _radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN, NRFLite::BITRATE2MBPS, 100) // THE DEFAULT
-    //   _radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN, NRFLite::BITRATE1MBPS, 75)
-    //   _radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN, NRFLite::BITRATE250KBPS, 0)
-    
-    if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN))
-    {
+    if(!radio.init(RADIO_ID, RADIO_CE, RADIO_CSN)) {
         Serial.println("Cannot communicate with radio");
-        while (1); // Wait here forever.
+        while (1); // Wait here until watchdog reboots us
     }
     Serial.println("radio init");
+    // receiver defaults to on, so we do too
+    tx_state = 1;
+    // pretend we are in ack phase
+    tx_acks = TX_MIN_ACK + 1;
+    tx_nacks = 0;
 }
 
-int sendHard(const char * data) {
+int tx_send_hard(const char * data) {
   unsigned long ts = millis();
-  int8_t ret;
+  int8_t ret = 0;
   Serial.print("Sending: ");
   Serial.println(data);
+  // long process - reset watchdog before we try
   wdt_reset();
-  while(1) {
-    if(_radio.send(DESTINATION_RADIO_ID, (void *)data, strlen(data))) {
+  // tight loop - must get as many transmissions as possible in in 15ms window receiver is awake...
+  while((millis() - ts) <= TX_SEND_MS) {
+    if(radio.send(RADIO_DST_ID, (void *)data, strlen(data))) {
       ret = 1;
       break;
     }
-    if((millis() - ts) > 6000UL) {
-      ret = 0;
-      break;
-    }
   }
+  // long process - reset watchdog when done
   wdt_reset();
   Serial.print("Send result: ");
   Serial.println(ret);
@@ -73,18 +87,14 @@ void docmd (void) {
     Serial.print("Sending: '");
     Serial.print(sbuf);
     Serial.print("':");
-    if (sendHard(sbuf))
-    {
+    if(tx_send_hard(sbuf)) {
         Serial.println("...Success");
-    }
-    else
-    {
+    } else {
         Serial.println("...Failed");
     }
 }
 
-void tx()
-{
+void tx() {
     while(Serial.available()) {
       if(cpos >= 32) {
         Serial.println("overflow");
